@@ -1,20 +1,24 @@
 ## SENM Galezo: Significance Testing and Figures
 ## Ali Galezo
 ## Created: 14 Dec 2018
-## Last modified: 4 Feb 2018
+## Last modified: 1 Oct 2019
 
 library(dplyr)
 library(ggplot2)
 library(lazyeval)
 library(gridExtra)
+library(kableExtra)
 
 ## Prepare environment.
 options(stringsAsFactors = FALSE)
 num_sim <- 1000
 
+# Make folder to save output into.
+dir.create("Results")
+
 ## Load files.
-observed <- read.csv("real_network_metrics_full.csv")
-expected <- read.csv("all_random_metrics_full.csv")
+observed <- read.csv("real_network_metrics_20190930.csv")
+expected <- read.csv("all_random_metrics_20190930.csv")
 dolphins <- unique(observed$ego)
 
 
@@ -37,41 +41,75 @@ observed %>%
 
 metrics <- c("mixdegree","ss_degree","os_degree","mixstrength","ss_strength","os_strength","os_strength_kin","os_strength_nonkin","mixcc","percent_close_kin")
 
-pVals <- data.frame(metric = rep(metrics, each = 2),
-                    sex = rep(c("FEMALE","MALE"), length(metrics)))
-
-#bonferroni <- nrow(pVals)
+combinations <- data.frame(metric = rep(metrics, each = 2),
+                           sex = rep(c("FEMALE","MALE"), length(metrics)))
 
 sigTester <- function(metric, sex){
   # This function calculates the p-value according to the rule P = (b + 1)/(m + 1),
   # Where b = number times a permuted value is more extreme than the observed value, and m = number of permutations.
+  # It returns the p-value, observed mean, and permuted mean.
   sex_ <- sex
-  expected_vals <-
+  n <- nrow(expected %>% filter(sex == sex_) %>% distinct(ego))
+  expected_means <-
     expected %>%
     group_by(sex, iteration) %>%
     summarize_(mean = interp(~mean(var, na.rm = TRUE), var = as.name(metric))) %>%
     filter(sex == sex_) %>%
     pull(mean)
-  observed_val <-
+  observed_mean <- 
     observed %>%
-    group_by(sex) %>%
-    summarize_(observed_mean = interp(~mean(var, na.rm = TRUE), var = as.name(metric))) %>%
     filter(sex == sex_) %>%
+    summarize_(observed_mean = interp(~mean(var, na.rm = TRUE), var = as.name(metric))) %>%
     pull(observed_mean)
-  extreme <- ifelse(observed_val >= median(expected_vals),
-                    sum(expected_vals > observed_val),
-                    sum(observed_val > expected_vals))
-  (extreme + 1) / (num_sim + 1)
+  extreme <- ifelse(observed_mean >= median(expected_means),
+                    sum(expected_means >= observed_mean),
+                    sum(observed_mean >= expected_means))
+  p <- (extreme + 1) / (num_sim + 1)
+  return(data.frame(metric = metric,
+                    sex = sex,
+                    n = n,
+                    p = p,
+                    obs_mean = observed_mean,
+                    exp_mean = mean(expected_means),
+                    exp_min = min(expected_means),
+                    exp_max = max(expected_means)
+                    ))
 }
 
-pVals$p <- mapply(sigTester,
-                  metric = pVals$metric,
-                  sex = pVals$sex)
-pVals$adjusted_p <- p.adjust(pVals$p, "bonferroni")
+results <- do.call("rbind",
+                   mapply(sigTester,
+                          metric = combinations$metric,
+                          sex = combinations$sex,
+                          SIMPLIFY = FALSE))
+results$adjusted_p <- p.adjust(results$p, "bonferroni")
 
-#pVals$adjusted_p <- round(pVals$adjusted_p, 4)
-
-# P-values greater than 1 can occur as a result of Bonferroni corrections.
+results %>%
+  mutate(obs_mean = round(obs_mean, 2),
+         exp_min = round(exp_min, 2),
+         exp_max = round(exp_max, 2),
+         adjusted_p = round(adjusted_p, 5)) %>%
+  mutate(expected_range = paste(exp_min, exp_max, sep = " - ")) %>%
+  select(metric, sex, obs_mean, expected_range, adjusted_p) %>%
+  mutate(sex = recode(sex, FEMALE = "Female", MALE = "Male")) %>%
+  mutate(metric = recode(metric,
+                         mixdegree = "Degree",
+                         ss_degree = "Same-sex degree",
+                         os_degree = "Opposite-sex degree",
+                         mixstrength = "Strength",
+                         ss_strength = "Same-sex strength",
+                         os_strength= "Opposite-sex strength",
+                         os_strength_kin = "Opposite-sex strength (kin only)",
+                         os_strength_nonkin = "Opposite-sex strength (non-kin only)",
+                         mixcc = "Clustering coefficient",
+                         percent_close_kin = "Proportion of close kin associated with")) %>%
+  rename('Social network metric' = metric,
+         'Sex' = sex,
+         'Observed mean' = obs_mean,
+         'Expected range' = expected_range,
+         'p' = adjusted_p) %>%
+  kable(format = "html", escape = FALSE) %>%
+  kable_styling(font_size = 10) %>%
+  save_kable(., file = paste(getwd(), "/Results/SocialMetricTable.txt", sep = ""), self_contained = FALSE)
 
 ########################################################################
 ## Figure 3 plots (observed vs. expected social network metrics)
@@ -133,30 +171,34 @@ SENMplot <- function(metric, sex){
 }
 
 ## Same-sex degree
-ggpubr::ggarrange(SENMplot("ss_degree", "FEMALE"),
+ssdegree <- ggpubr::ggarrange(SENMplot("ss_degree", "FEMALE"),
                   SENMplot("ss_degree", "MALE"),
                   ncol = 2, nrow = 1, common.legend = TRUE, legend = "bottom")
+ggsave("SSdegree.pdf", plot = ssdegree, device = "pdf", path = "Results", width = 6.1, height = 2.7, units = "in", dpi = 300)
 
 ## Opposite-sex degree
-ggpubr::ggarrange(SENMplot("os_degree", "FEMALE"),
+osdegree <- ggpubr::ggarrange(SENMplot("os_degree", "FEMALE"),
                   SENMplot("os_degree", "MALE"),
                   ncol = 2, nrow = 1, common.legend = TRUE, legend = "bottom")
+ggsave("OSdegree.pdf", plot = osdegree, device = "pdf", path = "Results", width = 6.1, height = 2.7, units = "in", dpi = 300)
 
 ## Strength
-ggpubr::ggarrange(SENMplot("mixstrength", "FEMALE"),
+strength <- ggpubr::ggarrange(SENMplot("mixstrength", "FEMALE"),
                   SENMplot("mixstrength", "MALE"),
                   ncol = 2, nrow = 1, common.legend = TRUE, legend = "bottom")
+ggsave("Strength.pdf", plot = strength, device = "pdf", path = "Results", width = 6.1, height = 2.7, units = "in", dpi = 300)
 
 ## Clustering coefficient
-ggpubr::ggarrange(SENMplot("mixcc", "FEMALE"),
+clustering <- ggpubr::ggarrange(SENMplot("mixcc", "FEMALE"),
                   SENMplot("mixcc", "MALE"),
                   ncol = 2, nrow = 1, common.legend = TRUE, legend = "bottom")
+ggsave("Clustering.pdf", plot = clustering, device = "pdf", path = "Results", width = 6.1, height = 2.7, units = "in", dpi = 300)
 
 ## Percent close kin associated with
-ggpubr::ggarrange(SENMplot("percent_close_kin", "FEMALE"),
+propkin <- ggpubr::ggarrange(SENMplot("percent_close_kin", "FEMALE"),
                   SENMplot("percent_close_kin", "MALE"),
                   ncol = 2, nrow = 1, common.legend = TRUE, legend = "bottom")
-
+ggsave("Kin.pdf", plot = propkin, device = "pdf", path = "Results", width = 6.1, height = 2.7, units = "in", dpi = 300)
 
 ########################################################################
 ## Compare 1) strength of same-sex bonds and 2) clustering coefficients in males vs. females
