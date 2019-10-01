@@ -13,7 +13,7 @@ library(kableExtra)
 options(stringsAsFactors = FALSE)
 num_sim <- 1000
 
-# Make folder to save output into.
+## Make folder to save output into.
 dir.create("Results")
 
 ## Load files.
