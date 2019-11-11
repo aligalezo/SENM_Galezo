@@ -201,26 +201,52 @@ propkin <- ggpubr::ggarrange(SENMplot("percent_close_kin", "FEMALE"),
 ggsave("Kin.pdf", plot = propkin, device = "pdf", path = "Results", width = 6.1, height = 2.7, units = "in", dpi = 300)
 
 ########################################################################
-## Compare 1) strength of same-sex bonds and 2) clustering coefficients in males vs. females
+## Compare 1) strength of same-sex bonds
+## 2) clustering coefficients in males vs. females
+## 3) degree in males vs. females
 ########################################################################
 
 ## Calculate differential between observed and expected (positive value: observed is higher than expected)
 combined <- merge(x = expected, y = observed, by = "ego")
 combined$ss_strength_differential <- combined$ss_strength.y - combined$ss_strength.x
 combined$cc_differential <- combined$mixcc.y - combined$mixcc.x
+combined$degree_differential <- combined$mixdegree.y - combined$mixdegree.x
 combined <-
   combined %>%
   group_by(ego) %>%
   summarize(strength_differential = mean(ss_strength_differential),
             cc_differential = mean(cc_differential),
+            degree_differential = mean(degree_differential),
             sex = max(sex.x))
 ## Strength of same-sex bonds:
+combined %>%
+  group_by(sex) %>% 
+  summarize(mean = mean(strength_differential, na.rm = TRUE),
+            sd = sd(strength_differential, na.rm = TRUE),
+            n = n(),
+            se = sd/sqrt(n))
 perm::permTS(combined %>% filter(sex == "FEMALE") %>% pull(strength_differential),
              combined %>% filter(sex == "MALE") %>% pull(strength_differential),
              alternative = "two.sided", exact = TRUE)
 ## Clustering coefficients:
+combined %>%
+  group_by(sex) %>% 
+  summarize(mean = mean(cc_differential, na.rm = TRUE),
+            sd = sd(cc_differential, na.rm = TRUE),
+            n = n(),
+            se = sd/sqrt(n))
 perm::permTS(combined %>% filter(sex == "FEMALE") %>% filter(!is.na(cc_differential)) %>% pull(cc_differential),
              combined %>% filter(sex == "MALE") %>% filter(!is.na(cc_differential)) %>% pull(cc_differential),
+             alternative = "two.sided", exact = TRUE)
+## Degree:
+combined %>%
+  group_by(sex) %>% 
+  summarize(mean = mean(degree_differential, na.rm = TRUE),
+            sd = sd(degree_differential, na.rm = TRUE),
+            n = n(),
+            se = sd/sqrt(n))
+perm::permTS(combined %>% filter(sex == "FEMALE") %>% filter(!is.na(degree_differential)) %>% pull(degree_differential),
+             combined %>% filter(sex == "MALE") %>% filter(!is.na(degree_differential)) %>% pull(degree_differential),
              alternative = "two.sided", exact = TRUE)
 
 
@@ -230,12 +256,26 @@ perm::permTS(combined %>% filter(sex == "FEMALE") %>% filter(!is.na(cc_different
 
 ## Compare strengh of same-sex vs opposite-sex bonds
 strengths <- data.frame(id = as.factor(rep(observed$ego, 2)),
+                        sex = as.factor(rep(observed$sex, 2)),
                         class = as.factor(c(rep("opposite", nrow(observed)), rep("same", nrow(observed)))),
                         strength = c(observed$os_strength, observed$ss_strength))
+strengths %>%
+  group_by(sex, class) %>%
+  summarize(mean = mean(strength),
+            sd = sd(strength),
+            n = n(),
+            se = sd/sqrt(n))
 coin::symmetry_test(strength ~ class | id, data = strengths, alternative = "two.sided")
 
 ## Compare abundance of same-sex vs. opposite-sex bonds
 degrees <- data.frame(id = as.factor(rep(observed$ego, 2)),
+                      sex = as.factor(rep(observed$sex, 2)),
                       class = as.factor(c(rep("opposite", nrow(observed)), rep("same", nrow(observed)))),
                       degree = c(observed$os_degree, observed$ss_degree))
+degrees %>%
+  group_by(sex, class) %>%
+  summarize(mean = mean(degree),
+            sd = sd(degree),
+            n = n(),
+            se = sd/sqrt(n))
 coin::symmetry_test(degree ~ class | id, data = degrees, alternative = "less")
