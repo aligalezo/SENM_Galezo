@@ -225,6 +225,15 @@ combined %>%
             sd = sd(strength_differential, na.rm = TRUE),
             n = n(),
             se = sd/sqrt(n))
+observed %>%
+  select(ego, sex, ss_strength) %>%
+  merge(x = ., y = combined[c("ego","strength_differential")], by = "ego", all.x = TRUE) %>%
+  mutate(percent_of_observed = strength_differential/ss_strength) %>%
+  group_by(sex) %>%
+  summarize(mean = mean(percent_of_observed)*100,
+            sd = sd(percent_of_observed)*100,
+            n = n(),
+            se = sd/sqrt(n))
 perm::permTS(combined %>% filter(sex == "FEMALE") %>% pull(strength_differential),
              combined %>% filter(sex == "MALE") %>% pull(strength_differential),
              alternative = "two.sided", exact = TRUE)
