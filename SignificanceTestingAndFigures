@@ -287,4 +287,4 @@ degrees %>%
             sd = sd(degree),
             n = n(),
             se = sd/sqrt(n))
-coin::symmetry_test(degree ~ class | id, data = degrees, alternative = "less")
+coin::symmetry_test(degree ~ class | id, data = degrees, alternative = "two.sided")
