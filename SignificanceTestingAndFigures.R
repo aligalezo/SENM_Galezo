@@ -1,7 +1,7 @@
-## SENM Galezo: Significance Testing and Figures
+## SENM Significance Testing and Figures
 ## Ali Galezo
 ## Created: 14 Dec 2018
-## Last modified: 1 Oct 2019
+## Last modified: 25 Feb 2020
 
 library(dplyr)
 library(ggplot2)
@@ -109,7 +109,7 @@ results %>%
          'p' = adjusted_p) %>%
   kable(format = "html", escape = FALSE) %>%
   kable_styling(font_size = 10) %>%
-  save_kable(., file = paste(getwd(), "/Results/SocialMetricTable.txt", sep = ""), self_contained = FALSE)
+  save_kable(., file = paste(getwd(), "/Results/SocialMetricTable", sep = ""), self_contained = FALSE)
 
 ########################################################################
 ## Figure 3 plots (observed vs. expected social network metrics)
@@ -170,35 +170,34 @@ SENMplot <- function(metric, sex){
           legend.title=element_blank())
 }
 
-## Same-sex degree
-ssdegree <- ggpubr::ggarrange(SENMplot("ss_degree", "FEMALE"),
-                  SENMplot("ss_degree", "MALE"),
-                  ncol = 2, nrow = 1, common.legend = TRUE, legend = "bottom")
-ggsave("SSdegree.pdf", plot = ssdegree, device = "pdf", path = "Results", width = 6.1, height = 2.7, units = "in", dpi = 300)
+## Plot all together
+ssdegree <- ggpubr::ggarrange(SENMplot("ss_degree", "FEMALE") + theme(legend.position = "none"),
+                              SENMplot("ss_degree", "MALE") + theme(legend.position = "none"),
+                              ncol = 2, nrow = 1)
+osdegree <- ggpubr::ggarrange(SENMplot("os_degree", "FEMALE") + theme(legend.position = "none"),
+                              SENMplot("os_degree", "MALE") + theme(legend.position = "none"),
+                              ncol = 2, nrow = 1)
+strength <- ggpubr::ggarrange(SENMplot("mixstrength", "FEMALE") + theme(legend.position = "none"),
+                              SENMplot("mixstrength", "MALE") + theme(legend.position = "none"),
+                              ncol = 2, nrow = 1)
+clustering <- ggpubr::ggarrange(SENMplot("mixcc", "FEMALE") + theme(legend.position = "none"),
+                                SENMplot("mixcc", "MALE") + theme(legend.position = "none"),
+                                ncol = 2, nrow = 1)
+propkin <- ggpubr::ggarrange(SENMplot("percent_close_kin", "FEMALE") + theme(legend.position = "none"),
+                             SENMplot("percent_close_kin", "MALE") + theme(legend.position = "none"),
+                             ncol = 2, nrow = 1)
+legend <- ggpubr::get_legend(SENMplot("percent_close_kin", "FEMALE"))
 
-## Opposite-sex degree
-osdegree <- ggpubr::ggarrange(SENMplot("os_degree", "FEMALE"),
-                  SENMplot("os_degree", "MALE"),
-                  ncol = 2, nrow = 1, common.legend = TRUE, legend = "bottom")
-ggsave("OSdegree.pdf", plot = osdegree, device = "pdf", path = "Results", width = 6.1, height = 2.7, units = "in", dpi = 300)
-
-## Strength
-strength <- ggpubr::ggarrange(SENMplot("mixstrength", "FEMALE"),
-                  SENMplot("mixstrength", "MALE"),
-                  ncol = 2, nrow = 1, common.legend = TRUE, legend = "bottom")
-ggsave("Strength.pdf", plot = strength, device = "pdf", path = "Results", width = 6.1, height = 2.7, units = "in", dpi = 300)
-
-## Clustering coefficient
-clustering <- ggpubr::ggarrange(SENMplot("mixcc", "FEMALE"),
-                  SENMplot("mixcc", "MALE"),
-                  ncol = 2, nrow = 1, common.legend = TRUE, legend = "bottom")
-ggsave("Clustering.pdf", plot = clustering, device = "pdf", path = "Results", width = 6.1, height = 2.7, units = "in", dpi = 300)
-
-## Percent close kin associated with
-propkin <- ggpubr::ggarrange(SENMplot("percent_close_kin", "FEMALE"),
-                  SENMplot("percent_close_kin", "MALE"),
-                  ncol = 2, nrow = 1, common.legend = TRUE, legend = "bottom")
-ggsave("Kin.pdf", plot = propkin, device = "pdf", path = "Results", width = 6.1, height = 2.7, units = "in", dpi = 300)
+all <- ggpubr::ggarrange(ssdegree,
+                         osdegree,
+                         strength,
+                         clustering,
+                         propkin,
+                         ncol = 1,
+                         labels = c("A","B","C","D","E"),
+                         legend.grob = legend,
+                         legend = "bottom")
+ggsave("SENM_Results.tif", plot = all, device = "tiff", path = "Results", width = 177, height = 238, units = "mm", dpi = 300)
 
 ########################################################################
 ## Compare 1) strength of same-sex bonds
@@ -218,6 +217,7 @@ combined <-
             cc_differential = mean(cc_differential),
             degree_differential = mean(degree_differential),
             sex = max(sex.x))
+
 ## Strength of same-sex bonds:
 combined %>%
   group_by(sex) %>% 
@@ -237,6 +237,7 @@ observed %>%
 perm::permTS(combined %>% filter(sex == "FEMALE") %>% pull(strength_differential),
              combined %>% filter(sex == "MALE") %>% pull(strength_differential),
              alternative = "two.sided", exact = TRUE)
+
 ## Clustering coefficients:
 combined %>%
   group_by(sex) %>% 
@@ -247,6 +248,7 @@ combined %>%
 perm::permTS(combined %>% filter(sex == "FEMALE") %>% filter(!is.na(cc_differential)) %>% pull(cc_differential),
              combined %>% filter(sex == "MALE") %>% filter(!is.na(cc_differential)) %>% pull(cc_differential),
              alternative = "two.sided", exact = TRUE)
+
 ## Degree:
 combined %>%
   group_by(sex) %>% 
