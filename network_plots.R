@@ -12,8 +12,11 @@ lh<-lh[!duplicated(lh$dolphin_id),]
 male<-"AGA" #or try STA
 female<-"SHO" #or try CAB KIY SHO SQL
 
-male_ego<-real_ai_egos[[male]] 
-female_ego<-real_ai_egos[[female]] 
+# male_ego<-real_ai_egos[[male]] 
+# female_ego<-real_ai_egos[[female]] 
+
+male_ego<-as.matrix(read.csv("AGA_globalnetwork.csv", row.names = 1))
+female_ego<-as.matrix(read.csv("SHO_globalnetwork.csv", row.names = 1))
 
 male_ego[is.na(male_ego)]<-0
 female_ego[is.na(female_ego)]<-0
@@ -52,13 +55,25 @@ minC[which(V(gf)$name==female)]<-maxC[which(V(gf)$name==female)]<-0
 female_layout <- layout_with_fr(gf, minx=minC, maxx=maxC,
                               miny=minC, maxy=maxC)
 
-# windows()
-pdf(file="networks20190125.pdf", width=7, height=4.33)
+#clustering coefficients
+gall<-graph.adjacency(male_ego, mode="undirected", weighted=TRUE,diag=FALSE)
+gfall<-graph.adjacency(female_ego, mode="undirected", weighted=TRUE,diag=FALSE)
+
+
+gsize<-transitivity(gall, type="weighted", vids=V(gall)[V(gall)$name %in% V(g)$name])*100
+gsize[is.na(gsize)]<-1
+
+gfsize<-transitivity(gfall, type="weighted", vids=V(gfall)[V(gfall)$name %in% V(gf)$name])*100
+
+
+#windows()
+pdf(file="networks20200109.pdf", width=7, height=4.33)
 
 par(mar=c(0,0,0,0), mfrow=c(1,2))
 
 plot(g,
-     vertex.size=((degree(g)/max(degree(g)))+0.25)*100, 
+     # vertex.size=((degree(g)/max(degree(g)))+0.25)*100,
+     vertex.size=gsize,
      vertex.color=adjustcolor(V(g)$color,alpha.f=1),
      vertex.shapes=V(g)$shape,
      edge.width = edge_attr(g)$weight*12,
@@ -74,7 +89,8 @@ plot(g,
 text(x=-6, y=8, "a", cex=1.5)
 
 plot(gf,
-     vertex.size=((degree(gf)/max(degree(gf)))+0.25)*100, 
+     # vertex.size=((degree(gf)/max(degree(gf)))+0.25)*100, 
+     vertex.size=gfsize,
      vertex.color=adjustcolor(V(gf)$color,alpha.f=1),
      vertex.shapes=V(gf)$shape,
      edge.width = edge_attr(gf)$weight*12,
